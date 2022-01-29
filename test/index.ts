@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { BigNumber, Contract } from "ethers";
 import { ethers } from "hardhat";
 import Sinon from "sinon";
+import { generateMerkle } from "./generateMerkletree";
 
 const OWNABLE_MSG = "Ownable: caller is not the owner";
 
@@ -100,6 +101,77 @@ describe("Simples", function () {
   });
 
   // MINTING
+  it("Rejects whitelist mint if whitelist is not active", async () => {
+    const merkle = generateMerkle([address1.address]);
+    const hexProof = merkle.getHexProof(address1.address);
+    await expect(
+      contract.connect(address1).whiteListMint(hexProof)
+    ).to.be.revertedWith("WhiteList mint is not active");
+  });
+
+  it("Disables normal mint meanwhile whitelist is active", async () => {
+    await contract.connect(owner).setWhiteListActive(true);
+    const price = await contract.price();
+
+    await expect(
+      contract.connect(address1).mint({ value: price })
+    ).to.be.revertedWith("Whitelist mint is active");
+
+    const numTokens = 2;
+
+    await expect(
+      contract
+        .connect(address1)
+        .mintMultiple(numTokens, { value: price.mul(numTokens) })
+    ).to.be.revertedWith("Whitelist mint is active");
+  });
+
+  it('Disables whitelist, allows to resume normal mint', async () => {
+    await contract.connect(owner).setWhiteListActive(true);
+    await contract.connect(owner).setWhiteListActive(false);
+    
+    const price = await contract.price();
+    await contract.connect(address1).mint({ value: price });
+    expect(await contract.connect(owner).ownerOf(1)).to.be.equal(
+      address1.address
+    );
+  });
+
+  it("Allows whitelisted addresses to mint", async () => {
+    const merkle = generateMerkle([address1.address]);
+    const rootHash = merkle.getRoot();
+    const hexProof = merkle.getHexProof(address1.address);
+
+    // sets the merkle root
+    await contract.connect(owner).setMerkleRoot(rootHash);
+    await contract.connect(owner).setWhiteListActive(true);
+
+    // Reverts not whitelisted address
+    const hexProof2 = merkle.getHexProof(address2.address);
+
+    await expect(
+      contract.connect(address2).whiteListMint(hexProof2)
+    ).to.be.revertedWith("Invalid proof");
+
+    // mints 2 correctly
+    await contract.connect(address1).whiteListMint(hexProof);
+    expect(await contract.connect(owner).ownerOf(1)).to.be.equal(
+      address1.address
+    );
+
+    expect(await contract.connect(owner).ownerOf(2)).to.be.equal(
+      address1.address
+    );
+
+    // Only mint 2 in whitelist
+    await expect(contract.connect(owner).ownerOf(3)).to.be.revertedWith(
+      "ERC721: owner query for nonexistent token"
+    );
+
+    await expect(
+      contract.connect(address1).whiteListMint(hexProof)
+    ).to.be.revertedWith("Address already claimed from whitelist");
+  });
 
   it("Should allow owner to safe mint", async () => {
     const tokenId = await contract.getCurrentTokenId();
@@ -118,7 +190,7 @@ describe("Simples", function () {
     expect(await contract.connect(owner).getCurrentTokenId()).to.be.equal(2);
   });
 
-  it("Should revert if non-owner try to safe mint", async () => {
+  it("Should revert if non-owner try to owner mint", async () => {
     await expect(
       contract.connect(address1).ownerMint(1, address2.address)
     ).to.be.revertedWith(OWNABLE_MSG);
@@ -265,7 +337,7 @@ describe("Simples", function () {
     expect(await contract.connect(owner).ownerOf(2)).to.be.equal(
       address1.address
     );
-    // expect token 21 doesn't exist
+    // expect token 3 doesn't exist
     await expect(contract.connect(owner).ownerOf(3)).to.be.revertedWith(
       "ERC721: owner query for nonexistent token"
     );

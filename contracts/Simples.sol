@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 /* 
 
       _____________________________________
@@ -36,7 +36,8 @@ contract Simples is
   uint256 public price = 0; //0 ETH :)
   uint256 private _maxSupply = 2000;
   uint256 private _maxMintAmount = 2;
-  mapping(address => bool) public whitelisted;
+  bool public whiteListActive = false;
+  bytes32 public merkleRoot;
 
   Counters.Counter private _tokenIdCounter;
 
@@ -56,11 +57,13 @@ contract Simples is
   mapping(uint256 => warrior) public warriors;
   mapping(uint256 => uint256) public experience;
   mapping(uint256 => uint256) public warriorsQuestLog;
+  mapping(address => bool) public whitelistClaimed;
 
   uint256 public xpPerQuest = 100;
   uint256 public maxLevelWarriors = 10;
   uint256 constant DAY = 1 days;
 
+  // Events
   event WarriorCreated(uint256 tokenId, warrior warriorCreated);
 
   event LeveledUp(address indexed leveler, uint256 tokenId, uint256 level);
@@ -70,6 +73,7 @@ contract Simples is
     uint256 xpGained,
     uint256 xpRemaining
   );
+
   event Quest(uint256 tokenId, uint256 xpGained, uint256 xpTotal);
 
   event NFTCreated(uint256 indexed tokenId);
@@ -84,8 +88,17 @@ contract Simples is
     _tokenIdCounter.increment();
   }
 
+
   function getCurrentTokenId() public view returns (uint256) {
     return _tokenIdCounter.current();
+  }
+
+  function setWhiteListActive(bool _active) public onlyOwner {
+    whiteListActive = _active;
+  }
+
+  function setMerkleRoot(bytes32 _merkleRoot) public onlyOwner {
+    merkleRoot = _merkleRoot;
   }
 
   function setPublicPrice(uint256 newPrice) public onlyOwner {
@@ -189,17 +202,43 @@ contract Simples is
     return current;
   }
 
+  function whiteListMint(bytes32[] calldata _merkleProof)
+    public
+    payable
+    nonReentrant
+  {
+    require(whiteListActive, "WhiteList mint is not active");
+    address to = _msgSender();
+    require(!whitelistClaimed[to], "Address already claimed from whitelist");
+
+    bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+    require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "Invalid proof");
+
+    uint256 supply = totalSupply();
+    // Mint 2 for free on whitelist
+    require(supply + 2 <= _maxSupply, "Exceeds maximum supply");
+
+    _internalMint(to);
+    _internalMint(to);
+
+    whitelistClaimed[to] = true;
+  }
+
   function mint()
     public
     payable
     nonReentrant
     tokenMintable(_tokenIdCounter.current())
   {
+    require(!whiteListActive, "Whitelist mint is active");
+
     address to = _msgSender();
     _internalMint(to);
   }
 
   function mintMultiple(uint256 _num) public payable {
+    require(!whiteListActive, "Whitelist mint is active");
+
     uint256 supply = totalSupply();
     address to = _msgSender();
     require(_num > 0, "The minimum is one token");
