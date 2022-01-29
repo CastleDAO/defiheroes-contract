@@ -126,10 +126,10 @@ describe("Simples", function () {
     ).to.be.revertedWith("Whitelist mint is active");
   });
 
-  it('Disables whitelist, allows to resume normal mint', async () => {
+  it("Disables whitelist, allows to resume normal mint", async () => {
     await contract.connect(owner).setWhiteListActive(true);
     await contract.connect(owner).setWhiteListActive(false);
-    
+
     const price = await contract.price();
     await contract.connect(address1).mint({ value: price });
     expect(await contract.connect(owner).ownerOf(1)).to.be.equal(
