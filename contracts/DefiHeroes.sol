@@ -34,8 +34,9 @@ contract DefiHeroes is
   bytes32 public constant GAME_ROLE = keccak256("GAME_ROLE");
 
   uint256 public price = 0; //0 ETH :)
-  uint256 private _maxSupply = 2000;
-  uint256 private _maxMintAmount = 2;
+  uint256 public priceMultiple = 10000000000000000; // 0.01 ETH
+  uint256 private _maxSupply = 4000;
+  uint256 private _maxMintAmount = 5;
   bool public whiteListActive = false;
   bytes32 public merkleRoot;
 
@@ -57,7 +58,8 @@ contract DefiHeroes is
   mapping(uint256 => warrior) public warriors;
   mapping(uint256 => uint256) public experience;
   mapping(uint256 => uint256) public warriorsQuestLog;
-  mapping(address => bool) public whitelistClaimed;
+  mapping(address => bool) public freeclaimed;
+
 
   uint256 public xpPerQuest = 100;
   uint256 public maxLevelWarriors = 10;
@@ -105,7 +107,7 @@ contract DefiHeroes is
     price = newPrice;
   }
 
-  function setMaxSupply(uint256 _newMaxSupply) private {
+  function setMaxSupply(uint256 _newMaxSupply) public onlyOwner {
     _maxSupply = _newMaxSupply;
   }
 
@@ -122,7 +124,7 @@ contract DefiHeroes is
   }
 
   // Create warriors
-  function _createWarriro(uint256 _tokenId) internal {
+  function _createWarrior(uint256 _tokenId) internal {
     warriors[_tokenId].speed = randomFromString(
       string(abi.encodePacked("speed", toString(_tokenId))),
       12
@@ -160,8 +162,8 @@ contract DefiHeroes is
 
     warriors[_tokenId].constitution = randomFromString(
       string(abi.encodePacked("constitution", toString(_tokenId))),
-      12
-    );
+      11
+    ) + 1;
     warriors[_tokenId].level = 1;
     experience[_tokenId] = 0;
 
@@ -194,7 +196,7 @@ contract DefiHeroes is
     uint256 current = _tokenIdCounter.current();
     require(current <= _maxSupply, "Max token reached");
 
-    _createWarriro(current);
+    _createWarrior(current);
     _safeMint(_address, current);
     emit NFTCreated(current);
     _tokenIdCounter.increment();
@@ -209,7 +211,7 @@ contract DefiHeroes is
   {
     require(whiteListActive, "WhiteList mint is not active");
     address to = _msgSender();
-    require(!whitelistClaimed[to], "Address already claimed from whitelist");
+    require(!freeclaimed[to], "Address already claimed");
 
     bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
     require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "Invalid proof");
@@ -221,7 +223,7 @@ contract DefiHeroes is
     _internalMint(to);
     _internalMint(to);
 
-    whitelistClaimed[to] = true;
+    freeclaimed[to] = true;
   }
 
   function mint()
@@ -233,7 +235,9 @@ contract DefiHeroes is
     require(!whiteListActive, "Whitelist mint is active");
 
     address to = _msgSender();
+    require(!freeclaimed[to], "Address already claimed");
     _internalMint(to);
+    freeclaimed[to] = true;
   }
 
   function mintMultiple(uint256 _num) public payable {
@@ -242,9 +246,9 @@ contract DefiHeroes is
     uint256 supply = totalSupply();
     address to = _msgSender();
     require(_num > 0, "The minimum is one token");
-    require(_num <= _maxMintAmount, "You can mint a max of 2 tokens");
+    require(_num <= _maxMintAmount, "You can mint a max of 5 tokens");
     require(supply + _num <= _maxSupply, "Exceeds maximum supply");
-    require(msg.value >= price * _num, "Ether sent is not enough");
+    require(msg.value >= priceMultiple * _num, "Ether sent is not enough");
 
     for (uint256 i; i < _num; i++) {
       _internalMint(to);

@@ -174,7 +174,7 @@ describe("DefiHeroes", function () {
 
     await expect(
       contract.connect(address1).whiteListMint(hexProof)
-    ).to.be.revertedWith("Address already claimed from whitelist");
+    ).to.be.revertedWith("Address already claimed");
   });
 
   it("Should allow owner to safe mint", async () => {
