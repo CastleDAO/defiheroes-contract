@@ -2,27 +2,28 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, Contract } from "ethers";
 import { ethers } from "hardhat";
+import keccak256 from "keccak256";
 import Sinon from "sinon";
 import { generateMerkle } from "./generateMerkletree";
-
+import allwhitelist from './whitelist.json';
 const OWNABLE_MSG = "Ownable: caller is not the owner";
 
-describe("Simples", function () {
+describe("DefiHeroes", function () {
   let contract: Contract;
   let owner: SignerWithAddress;
   let address1: SignerWithAddress;
   let address2: SignerWithAddress;
 
   beforeEach(async () => {
-    const ContractFactory = await ethers.getContractFactory("Simples");
+    const ContractFactory = await ethers.getContractFactory("DefiHeroes");
     [owner, address1, address2] = await ethers.getSigners();
     contract = await ContractFactory.deploy("https://baseUri/", 10000);
   });
 
   // Correct deployment
   it("Should initialize contract with name, symbol, baseUri and token counter", async () => {
-    expect(await contract.symbol()).to.equal("SIMPLES");
-    expect(await contract.name()).to.equal("Simples");
+    expect(await contract.symbol()).to.equal("DEFIHEROES");
+    expect(await contract.name()).to.equal("DefiHeroes");
     expect(await contract.getCurrentTokenId()).to.equal(1);
     // mint a token and get tokenUri
     await contract.connect(owner).ownerMint(1, owner.address, { value: 0 });
@@ -102,7 +103,7 @@ describe("Simples", function () {
 
   // MINTING
   it("Rejects whitelist mint if whitelist is not active", async () => {
-    const merkle = generateMerkle([address1.address]);
+    const merkle = generateMerkle([address1.address, ...allwhitelist]);
     const hexProof = merkle.getHexProof(address1.address);
     await expect(
       contract.connect(address1).whiteListMint(hexProof)
@@ -138,9 +139,12 @@ describe("Simples", function () {
   });
 
   it("Allows whitelisted addresses to mint", async () => {
-    const merkle = generateMerkle([address1.address]);
+    console.log(allwhitelist[1])
+    const newWL = [address1.address, ...allwhitelist]
+    console.log(newWL.length)
+    const merkle = generateMerkle(newWL);
     const rootHash = merkle.getRoot();
-    const hexProof = merkle.getHexProof(address1.address);
+    const hexProof = merkle.getHexProof(keccak256(address1.address));
 
     // sets the merkle root
     await contract.connect(owner).setMerkleRoot(rootHash);
@@ -542,7 +546,7 @@ describe("Simples", function () {
   });
 
   it("Should not mint more than maxSupply", async () => {
-    const factory = await ethers.getContractFactory("Simples");
+    const factory = await ethers.getContractFactory("DefiHeroes");
     const contractLimit = await factory.deploy("https://baseUri/", 2);
     const price = await contractLimit.price();
 
@@ -558,7 +562,7 @@ describe("Simples", function () {
   });
 
   it("Should not mint multiple more than maxSupply", async () => {
-    const Factory = await ethers.getContractFactory("Simples");
+    const Factory = await ethers.getContractFactory("DefiHeroes");
     const max = 1;
     const contractLimit = await Factory.deploy("https://baseUri/", max);
     const price = await contractLimit.price();

@@ -14,13 +14,13 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
       _____________________________________
      |                                     |
      |                  The                |
-     |               Simples               |
-     |_____________________________________|
+     |               Defi Heroes           |
+     |______________by CastleDAO___________|
      
 
 */
 
-contract Simples is
+contract DefiHeroes is
   ERC721,
   ERC721Enumerable,
   Pausable,
@@ -79,7 +79,7 @@ contract Simples is
   event NFTCreated(uint256 indexed tokenId);
 
   constructor(string memory newBaseURI, uint256 newMaxSupply)
-    ERC721("Simples", "SIMPLES")
+    ERC721("DefiHeroes", "DEFIHEROES")
   {
     setBaseURI(newBaseURI);
     setMaxSupply(newMaxSupply);
