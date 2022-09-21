@@ -1,6 +1,6 @@
-# Warriors
+# DefiHeroes
 
-Smart Contract - ERC721 for Warriors NFT
+Smart Contract - ERC721 for DefiHeroes NFT
 
 ```shell
 npx hardhat accounts
