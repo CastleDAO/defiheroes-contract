@@ -13,10 +13,12 @@ describe("DefiHeroes", function () {
   let owner: SignerWithAddress;
   let address1: SignerWithAddress;
   let address2: SignerWithAddress;
+  let address3: SignerWithAddress;
+
 
   beforeEach(async () => {
     const ContractFactory = await ethers.getContractFactory("DefiHeroes");
-    [owner, address1, address2] = await ethers.getSigners();
+    [owner, address1, address2, address3] = await ethers.getSigners();
     contract = await ContractFactory.deploy("https://baseUri/", 10000);
   });
 
@@ -112,7 +114,7 @@ describe("DefiHeroes", function () {
 
   it("Disables normal mint meanwhile whitelist is active", async () => {
     await contract.connect(owner).setWhiteListActive(true);
-    const price = await contract.price();
+    const price = await contract.priceMultiple();
 
     await expect(
       contract.connect(address1).mint({ value: price })
@@ -327,19 +329,19 @@ describe("DefiHeroes", function () {
   });
 
   it("Should let user mint N < maxAllowed tokens", async () => {
-    const price = await contract.price();
+    const price = await contract.priceMultiple();
     const numTokens = 2;
 
     await contract
-      .connect(address1)
+      .connect(address3)
       .mintMultiple(numTokens, { value: price.mul(numTokens) });
     expect(await contract.getCurrentTokenId()).to.be.equal(BigNumber.from(3));
-    // expect token 1 and 20 belongs to address1
+    // expect token 1 and 20 belongs to address3
     expect(await contract.connect(owner).ownerOf(1)).to.be.equal(
-      address1.address
+      address3.address
     );
     expect(await contract.connect(owner).ownerOf(2)).to.be.equal(
-      address1.address
+      address3.address
     );
     // expect token 3 doesn't exist
     await expect(contract.connect(owner).ownerOf(3)).to.be.revertedWith(
@@ -412,7 +414,7 @@ describe("DefiHeroes", function () {
   // });
 
   it("Should increase counter after user mint multiple", async () => {
-    const price = await contract.price();
+    const price = await contract.priceMultiple();
     const num = 2;
     await contract
       .connect(address1)
@@ -432,18 +434,18 @@ describe("DefiHeroes", function () {
   // });
 
   it("Should not let user mint N > maxAllowed tokens", async () => {
-    const price = await contract.price();
-    const numTokens = 3;
+    const price = await contract.priceMultiple();
+    const numTokens = 8;
 
     await expect(
       contract
         .connect(address1)
         .mintMultiple(numTokens, { value: price.mul(numTokens) })
-    ).to.be.revertedWith("You can mint a max of 2 tokens");
+    ).to.be.revertedWith("You can mint a max of 5 tokens");
   });
 
   it("Should not let user mint multiple with 0 or less tokens", async () => {
-    const price = await contract.price();
+    const price = await contract.priceMultiple();
     const numTokens = 0;
     const negativeNumTokens = -10;
 
@@ -469,7 +471,7 @@ describe("DefiHeroes", function () {
   });
 
   it("Should not mint multiple if paused", async () => {
-    const price = await contract.price();
+    const price = await contract.priceMultiple();
     const num = 2;
     await contract.connect(owner).pause();
     await expect(
@@ -527,9 +529,8 @@ describe("DefiHeroes", function () {
   });
 
   it("Should increase contract balance after mint multiple", async () => {
-    await contract.setPublicPrice(BigNumber.from("50000000000000000"));
 
-    const price = await contract.price();
+    const price = await contract.priceMultiple();
     const num = 2;
 
     const balancePreMint = await contract.provider.getBalance(contract.address);
@@ -542,20 +543,18 @@ describe("DefiHeroes", function () {
       contract.address
     );
 
-    expect(balancePostMint).to.equal(BigNumber.from("100000000000000000"));
+    expect(balancePostMint).to.equal(BigNumber.from("20000000000000000"));
   });
 
   it("Should not mint more than maxSupply", async () => {
     const factory = await ethers.getContractFactory("DefiHeroes");
     const contractLimit = await factory.deploy("https://baseUri/", 2);
-    const price = await contractLimit.price();
+    const price = await contractLimit.priceMultiple();
 
-    await contractLimit.connect(address1).mint({ value: price });
-    await contractLimit.connect(address1).mint({ value: price });
     await expect(
-      contractLimit.connect(address1).mint({ value: price })
-    ).to.be.revertedWith("Token ID invalid");
-    expect(await contractLimit.getCurrentTokenId()).to.equal(3);
+      contractLimit.connect(address1).mintMultiple(3, { value: price })
+    ).to.be.revertedWith("Exceeds maximum supply");
+    expect(await contractLimit.getCurrentTokenId()).to.equal(1);
     await expect(contractLimit.connect(owner).ownerOf(4)).to.be.revertedWith(
       "ERC721: owner query for nonexistent token"
     );
@@ -565,7 +564,7 @@ describe("DefiHeroes", function () {
     const Factory = await ethers.getContractFactory("DefiHeroes");
     const max = 1;
     const contractLimit = await Factory.deploy("https://baseUri/", max);
-    const price = await contractLimit.price();
+    const price = await contractLimit.priceMultiple();
 
     await expect(
       contractLimit.connect(address1).mintMultiple(2, { value: price })
